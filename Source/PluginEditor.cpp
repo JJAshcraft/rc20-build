@@ -268,12 +268,59 @@ PatinaEditor::PatinaEditor (PatinaProcessor& p)
                                                              &lowCut, &highCut, &mix, &output })
         addAndMakeVisible (c);
 
+    // preset browser, grouped by category
+    juce::String lastCategory;
+    for (int i = 0; i < patina::numFactoryPresets; ++i)
+    {
+        const auto& preset = patina::factoryPresets[i];
+        if (lastCategory != preset.category)
+        {
+            if (i > 0) presetBox.addSeparator();
+            presetBox.addSectionHeading (preset.category);
+            lastCategory = preset.category;
+        }
+        presetBox.addItem (preset.name, i + 1);
+    }
+    presetBox.setTextWhenNothingSelected ("Presets");
+    presetBox.setJustificationType (juce::Justification::centred);
+    presetBox.onChange = [this]
+    {
+        const int idx = presetBox.getSelectedId() - 1;
+        if (idx >= 0 && idx != processor.getCurrentProgram())
+            processor.setCurrentProgram (idx);
+    };
+    addAndMakeVisible (presetBox);
+
+    auto step = [this] (int delta)
+    {
+        const int n = patina::numFactoryPresets;
+        processor.setCurrentProgram ((processor.getCurrentProgram() + delta + n) % n);
+        syncPresetBox();
+    };
+    prevPreset.onClick = [step] { step (-1); };
+    nextPreset.onClick = [step] { step (+1); };
+    for (auto* b : { &prevPreset, &nextPreset })
+    {
+        b->setColour (juce::TextButton::buttonColourId, Palette::knobBody);
+        b->setColour (juce::TextButton::textColourOffId, Palette::text);
+        b->setColour (juce::ComboBox::outlineColourId, Palette::panelEdge);
+        addAndMakeVisible (b);
+    }
+    processor.onPresetChanged = [this] { syncPresetBox(); };
+    syncPresetBox();
+
     setSize (900, 600);
 }
 
 PatinaEditor::~PatinaEditor()
 {
+    processor.onPresetChanged = nullptr;
     setLookAndFeel (nullptr);
+}
+
+void PatinaEditor::syncPresetBox()
+{
+    presetBox.setSelectedId (processor.getCurrentProgram() + 1, juce::dontSendNotification);
 }
 
 void PatinaEditor::paint (juce::Graphics& g)
@@ -297,8 +344,13 @@ void PatinaEditor::resized()
     auto r = getLocalBounds().reduced (24, 16);
 
     auto header = r.removeFromTop (60);
-    auto mag = header.removeFromRight (420).withSizeKeepingCentre (420, 30);
-    magnitudeCaption.setBounds (mag.removeFromLeft (90));
+    auto mag = header.removeFromRight (330).withSizeKeepingCentre (330, 30);
+    header.removeFromLeft (200);
+    auto presets = header.withSizeKeepingCentre (juce::jmin (300, header.getWidth() - 20), 30);
+    prevPreset.setBounds (presets.removeFromLeft (30));
+    nextPreset.setBounds (presets.removeFromRight (30));
+    presetBox.setBounds (presets.reduced (4, 0));
+    magnitudeCaption.setBounds (mag.removeFromLeft (84));
     magnitude.setBounds (mag.withTrimmedLeft (10));
 
     r.removeFromTop (12);

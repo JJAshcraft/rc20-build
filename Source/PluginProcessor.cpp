@@ -225,6 +225,59 @@ void PatinaProcessor::processChunk (juce::AudioBuffer<float>& chunk)
     }
 }
 
+const juce::String PatinaProcessor::getProgramName (int index)
+{
+    return juce::isPositiveAndBelow (index, patina::numFactoryPresets) ? patina::factoryPresets[index].name
+                                                                        : juce::String();
+}
+
+void PatinaProcessor::loadPreset (int index)
+{
+    if (! juce::isPositiveAndBelow (index, patina::numFactoryPresets))
+        return;
+
+    const auto& p = patina::factoryPresets[index];
+    auto set = [this] (const char* id, float value)
+    {
+        auto* param = apvts.getParameter (id);
+        param->beginChangeGesture();
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+        param->endChangeGesture();
+    };
+    auto stage = [&] (const char* onId, const char* amtId, const char* extraId, const patina::Stage& s)
+    {
+        set (onId, s.on ? 1.0f : 0.0f);
+        set (amtId, s.amount);
+        set (extraId, s.extra);
+    };
+
+    set (ParamID::magnitude, p.magnitude);
+    set (ParamID::noiseOn, p.noiseOn ? 1.0f : 0.0f);
+    set (ParamID::noiseAmt, p.noiseAmt);
+    set (ParamID::noiseType, (float) p.noiseType);
+    set (ParamID::noiseTone, p.noiseTone);
+    stage (ParamID::wobbleOn,   ParamID::wobbleAmt,   ParamID::wobbleRate,   p.wobble);
+    stage (ParamID::distortOn,  ParamID::distortAmt,  ParamID::distortTone,  p.distort);
+    stage (ParamID::digitalOn,  ParamID::digitalAmt,  ParamID::digitalRate,  p.digital);
+    stage (ParamID::spaceOn,    ParamID::spaceAmt,    ParamID::spaceSize,    p.space);
+    stage (ParamID::magneticOn, ParamID::magneticAmt, ParamID::magneticDrop, p.magnetic);
+    set (ParamID::lowCut, p.lowCut);
+    set (ParamID::highCut, p.highCut);
+    set (ParamID::mix, p.mix);
+    set (ParamID::output, p.outputDb);
+
+    currentPreset = index;
+    apvts.state.setProperty ("preset", index, nullptr);
+    updateHostDisplay (ChangeDetails().withProgramChanged (true));
+
+    if (onPresetChanged)
+        juce::MessageManager::callAsync ([safe = juce::WeakReference<PatinaProcessor> (this)]
+        {
+            if (safe != nullptr && safe->onPresetChanged)
+                safe->onPresetChanged();
+        });
+}
+
 juce::AudioProcessorEditor* PatinaProcessor::createEditor()
 {
     return new PatinaEditor (*this);
@@ -240,7 +293,10 @@ void PatinaProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            currentPreset = juce::jlimit (0, patina::numFactoryPresets - 1, (int) apvts.state.getProperty ("preset", 0));
+        }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

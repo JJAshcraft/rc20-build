@@ -62,6 +62,10 @@ private:
     PatinaLookAndFeel lnf;
     PatinaProcessor& processor;
 
+    juce::ComboBox presetBox;
+    juce::TextButton prevPreset { "<" }, nextPreset { ">" };
+    void syncPresetBox();
+
     juce::Slider magnitude;
     juce::Label magnitudeCaption;
     juce::AudioProcessorValueTreeState::SliderAttachment magnitudeAttachment;

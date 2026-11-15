@@ -22,6 +22,26 @@ Signal flow: `Wobble -> Magnetic -> Distort -> Digital -> Low/High Cut -> Space 
 The plugin reports 6 ms of latency (the wobble delay's centre point) so your DAW
 keeps it in time, and the dry path is delayed to match so the Mix knob never combs.
 
+## Presets
+
+30 factory presets, browsable from the header (or your DAW's program list).
+Each one is level-matched to the dry signal (within 0.2 dB), so A/B comparisons
+are honest instead of "louder sounds better".
+
+| Category | Presets |
+|---|---|
+| Basics | Default, Subtle Color, Mix Bus Glow |
+| Tape | Tape Glue, Warm Cassette, Worn Cassette, Broken Walkman, Lost VHS Tape |
+| Vinyl | Dusty Crate, Needle Drop, Old Gramophone, Lo-Fi Keys, Memory Loop |
+| Digital | Boom Bap Drums, 12-Bit Sampler, Handheld Chip, Bit Mangler |
+| Radio | AM Radio, Telephone Line, Late Night Radio, Ground Loop |
+| Ambient | Hazy Daydream, Ghost Room, Underwater, Seasick, Flutter Chorus |
+| Grit | Basement Show, Blown Speaker, Fuzz Box, Total Decay |
+
+Tips: **Subtle Color**, **Mix Bus Glow** and **Tape Glue** are built for busses
+and full mixes. Pull Magnitude down on any heavy preset to dial it back in proportion.
+Presets live in `Source/Presets.h`.
+
 ## Getting a build
 
 **Easiest:** every push runs GitHub Actions (`.github/workflows/build.yml`) on
@@ -56,13 +76,13 @@ cmake --build build --target PatinaSmokeTest
 ./build/PatinaSmokeTest_artefacts/Release/PatinaSmokeTest /some/output/dir
 ```
 
-It runs every stage with odd block sizes, checks for NaNs / runaway levels, confirms
+It runs every stage with odd block sizes, renders and loudness-checks all 30 presets, checks for NaNs / runaway levels, confirms
 Magnitude 0 is a bit-exact delayed copy of the input, writes before/after WAVs, and
 renders a screenshot of the UI.
 
 ## Ideas for next steps
 
 - 2x oversampling around Distort to cut aliasing at high drive
-- Presets / A-B compare
+- User preset saving / A-B compare
 - Per-stage "flux" (random modulation of each stage's amount)
 - Stereo wobble spread

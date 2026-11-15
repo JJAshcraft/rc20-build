@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include "DSP/Modules.h"
+#include "Presets.h"
 
 namespace ParamID
 {
@@ -53,14 +54,17 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 3.0; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override { return {}; }
+    int getNumPrograms() override { return patina::numFactoryPresets; }
+    int getCurrentProgram() override { return currentPreset; }
+    void setCurrentProgram (int index) override { loadPreset (index); }
+    const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    void loadPreset (int index);
+    std::function<void()> onPresetChanged; // called on the message thread
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     juce::AudioProcessorValueTreeState apvts;
@@ -85,6 +89,8 @@ private:
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay { 8192 };
     juce::AudioBuffer<float> dryBuffer;
     float currentMagnitude = 1.0f;
+    int currentPreset = 0;
 
+    JUCE_DECLARE_WEAK_REFERENCEABLE (PatinaProcessor)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PatinaProcessor)
 };

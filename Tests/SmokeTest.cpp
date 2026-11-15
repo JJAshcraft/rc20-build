@@ -105,6 +105,43 @@ int main (int argc, char** argv)
         }
     }
 
+    {   // every factory preset: sanity + loudness relative to dry (for level matching)
+        double drySq = 0.0;
+        for (int i = 0; i < len; ++i) drySq += (double) input.getSample (0, i) * input.getSample (0, i);
+        const float dryRms = (float) std::sqrt (drySq / len);
+        for (int idx = 0; idx < patina::numFactoryPresets; ++idx)
+        {
+            PatinaProcessor p;
+            p.setPlayConfigDetails (2, 2, sr, 512);
+            p.setCurrentProgram (idx);
+            p.prepareToPlay (sr, 512);
+            auto io = input;
+            juce::MidiBuffer midi;
+            for (int start = 0; start < len; start += 512)
+            {
+                juce::AudioBuffer<float> block (io.getArrayOfWritePointers(), 2, start, juce::jmin (512, len - start));
+                p.processBlock (block, midi);
+            }
+            double sq = 0.0; float peak = 0.0f; bool finite = true;
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < len; ++i)
+                {
+                    const float v = io.getSample (ch, i);
+                    finite &= std::isfinite (v);
+                    sq += (double) v * v; peak = juce::jmax (peak, std::abs (v));
+                }
+            const float rms = (float) std::sqrt (sq / (2.0 * len));
+            const float diff = juce::Decibels::gainToDecibels (rms) - juce::Decibels::gainToDecibels (dryRms);
+            std::cout << "preset " << juce::String (idx + 1).paddedLeft ('0', 2) << " "
+                      << p.getProgramName (idx).paddedRight (' ', 20) << " loudness vs dry "
+                      << juce::String (diff, 1).paddedLeft (' ', 6) << " dB, peak "
+                      << juce::String (juce::Decibels::gainToDecibels (peak), 1) << " dBFS\n";
+            if (! finite || peak > 4.0f) { std::cout << "FAIL preset " << idx << "\n"; ok = false; }
+            const auto name = p.getProgramName (idx).replaceCharacter (' ', '_').removeCharacters ("-");
+            writeWav (outDir.getChildFile ("presets").getChildFile (juce::String (idx + 1).paddedLeft ('0', 2) + "_" + name + ".wav"), io, sr);
+        }
+    }
+
     {   // Magnitude 0 + mix 1: should be a delayed copy of the input
         PatinaProcessor p;
         p.setPlayConfigDetails (2, 2, sr, 256);
