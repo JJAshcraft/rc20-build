@@ -1,0 +1,49 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libsdl2-dev gcc-aarch64-linux-gnu zip
+
+      - name: Engine test
+        run: make test
+
+      - name: Desktop build + UI test
+        run: |
+          make
+          tools/ui_test.sh
+
+      # Built inside Debian 10 (glibc 2.28) so the binary also runs on older
+      # ArkOS images, not only on dArkOS.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: R36S build (old glibc, arm64 container)
+        run: |
+          docker run --rm --platform linux/arm64 -v "$PWD":/src -w /src debian:buster bash -c '
+            set -e
+            sed -i "s|deb.debian.org|archive.debian.org|g; s|security.debian.org|archive.debian.org|g; /buster-updates/d" /etc/apt/sources.list
+            apt-get -o Acquire::Check-Valid-Until=false update -qq
+            apt-get install -y -qq --no-install-recommends gcc libc6-dev make libsdl2-dev binutils
+            make r36 CROSS= R36=build/r36-buster
+            chown -R '"$(id -u):$(id -g)"' build'
+
+      - name: Package
+        run: make package R36=build/r36-buster
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bramble
+          path: dist/Bramble.zip
